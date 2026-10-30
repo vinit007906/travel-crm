@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001/api";
+const API_BASE = import.meta.env.VITE_API_URL || "https://travel-crm-backend-ml5u.onrender.com/api";
 
 async function request(path, options = {}) {
   const token = localStorage.getItem("tripwise-token");
