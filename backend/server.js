@@ -16,16 +16,14 @@ const app = express();
 // CORS configuration
 app.use(cors({
   origin: [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:5175",
-    "http://localhost:5177"
+    "http://localhost:5177",
+    "https://travel-crm-gamma.vercel.app"
   ],
   credentials: true
 }));
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 
 // Health check
 app.get("/api/health", (_req, res) => {
