@@ -1,49 +1,78 @@
+
 import express from "express";
-import { sendWhatsAppTemplate } from "../services/interaktService.js";
+import mongoose from "mongoose";
+import Lead from "../models/Lead.js";
+import {
+  authenticateToken,
+  requireCampaignRole
+} from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Test WhatsApp template message
-router.post("/test", async (req, res) => {
+// Protect all WhatsApp campaign routes
+router.use(authenticateToken);
+router.use(requireCampaignRole);
+
+// Preview and validate a campaign without sending messages
+router.post("/preview", async (req, res) => {
   try {
-    const { phoneNumber, customerName } = req.body;
+    const { leadIds, message } = req.body;
 
-    if (!phoneNumber || !customerName) {
+    if (!Array.isArray(leadIds) || leadIds.length === 0) {
       return res.status(400).json({
-        message: "Phone number and customer name are required"
+        message: "Select at least one customer."
       });
     }
 
-    if (!/^[6-9]\d{9}$/.test(phoneNumber)) {
+    if (leadIds.length > 100) {
       return res.status(400).json({
-        message: "Enter a valid 10-digit Indian mobile number"
+        message: "Maximum 100 customers per campaign."
       });
     }
 
-    if (!process.env.INTERAKT_API_KEY) {
-      return res.status(500).json({
-        message: "Interakt API key is missing"
+    if (leadIds.some(id => !mongoose.isValidObjectId(id))) {
+      return res.status(400).json({
+        message: "One or more customer IDs are invalid."
       });
     }
 
-    const result = await sendWhatsAppTemplate({
-      phoneNumber,
-      templateName: process.env.INTERAKT_TEMPLATE_NAME,
-      languageCode: "en",
-      bodyValues: [customerName]
-    });
+    if (typeof message !== "string" || !message.trim()) {
+      return res.status(400).json({
+        message: "Campaign message is required."
+      });
+    }
 
-    res.status(200).json({
-      message: "WhatsApp API request completed",
-      result
+    const uniqueIds = [...new Set(leadIds)];
+
+    const leads = await Lead.find({
+      _id: { $in: uniqueIds }
+    }).select("name phone destination whatsappOptIn");
+
+    const eligible = leads.filter(
+      lead => lead.whatsappOptIn === true
+    );
+
+    const rejectedCount = uniqueIds.length - eligible.length;
+
+    res.json({
+      message: "Campaign preview validated. No WhatsApp messages were sent.",
+      selectedCount: uniqueIds.length,
+      eligibleCount: eligible.length,
+      rejectedCount,
+      recipients: eligible.map(lead => ({
+        id: lead._id,
+        name: lead.name,
+        phone: lead.phone,
+        destination: lead.destination
+      })),
+      sendingEnabled: false
     });
 
   } catch (error) {
-    console.error("WhatsApp test error:", error.response?.data || error.message);
+    console.error("Campaign preview error:", error);
 
     res.status(500).json({
-      message: "WhatsApp message could not be sent",
-      error: error.response?.data || error.message
+      message: "Unable to prepare campaign preview."
     });
   }
 });

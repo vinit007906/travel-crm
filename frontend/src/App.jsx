@@ -74,6 +74,28 @@ export default function App() {
   const [campaignMessage, setCampaignMessage] = useState(
     "Hello {{name}}! 👋 Greetings from TripWise Travel. Are you planning a trip to {{destination}}? Contact our team to explore our travel packages."
   );
+  const [campaignPreview, setCampaignPreview] = useState(null);
+const [campaignLoading, setCampaignLoading] = useState(false);
+const [campaignError, setCampaignError] = useState("");
+
+async function handleCampaignPreview() {
+  try {
+    setCampaignLoading(true);
+    setCampaignError("");
+    setCampaignPreview(null);
+
+    const result = await api.previewCampaign({
+      leadIds: selectedEligibleLeads.map(lead => lead._id),
+      message: campaignMessage
+    });
+
+    setCampaignPreview(result);
+  } catch (error) {
+    setCampaignError(error.message || "Campaign validation failed.");
+  } finally {
+    setCampaignLoading(false);
+  }
+}
 
   const flash = (type, message) => {
     setNotice({ type, message });
@@ -361,9 +383,31 @@ export default function App() {
                 <div><small>Selected recipients</small><b>{selectedEligibleLeads.length}</b></div>
                 <div><small>Template status</small><b>Pending approval</b></div>
               </div>
-              <button className="primary-btn" style={{marginTop:18}} disabled>
-                Send campaign — unavailable
-              </button>
+              <button
+  className="primary-btn"
+  style={{ marginTop: 18 }}
+  onClick={handleCampaignPreview}
+  disabled={campaignLoading || selectedEligibleLeads.length === 0}
+>
+  {campaignLoading ? "Validating..." : "Validate campaign"}
+</button>
+
+{campaignError && (
+  <p style={{ color: "red", marginTop: 10 }}>
+    {campaignError}
+  </p>
+)}
+
+{campaignPreview && (
+  <div style={{ marginTop: 18 }}>
+    <h3>Campaign validation result</h3>
+    <p>Selected customers: {campaignPreview.selectedCount}</p>
+    <p>Eligible customers: {campaignPreview.eligibleCount}</p>
+    <p>Rejected customers: {campaignPreview.rejectedCount}</p>
+    <p>{campaignPreview.message}</p>
+    <p>WhatsApp sending: Not enabled</p>
+  </div>
+)}
               <p className="muted role-footnote">Sending is disabled until the Interakt template is approved and the backend campaign endpoint is secured and connected. This screen does not send messages.</p>
             </section>
           </div>}

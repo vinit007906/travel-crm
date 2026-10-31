@@ -34,5 +34,11 @@ export const api = {
   convert: (id) => request(`/leads/${id}/convert`, { method: "POST", body: JSON.stringify({}) }),
   bookings: () => request("/bookings"),
   cancelBooking: (id) => request(`/bookings/${id}/cancel`, { method: "PATCH", body: JSON.stringify({}) }),
-  users: () => request("/users")
+  users: () => request("/users"),
+
+previewCampaign: (body) =>
+  request("/whatsapp/preview", {
+    method: "POST",
+    body: JSON.stringify(body)
+  })
 };
