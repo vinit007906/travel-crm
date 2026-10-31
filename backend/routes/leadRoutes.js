@@ -86,32 +86,96 @@ router.get("/:id", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+
 router.put("/:id", async (req, res, next) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid lead ID." });
-    const errors = validateLead(req.body, true);
-    if (errors.length) return res.status(400).json({ message: errors.join(" ") });
-    const lead = await Lead.findById(req.params.id);
-    if (!lead) return res.status(404).json({ message: "Lead not found." });
-    if (lead.status === "Converted") return res.status(400).json({ message: "Converted leads cannot be edited in this prototype." });
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: "Invalid lead ID." });
+    }
 
-    const allowed = ["name", "phone", "email", "destination", "budget", "travelDate", "assignedTo", "status", "notes"];
+    const errors = validateLead(req.body, true);
+    if (errors.length) {
+      return res.status(400).json({ message: errors.join(" ") });
+    }
+
+    const lead = await Lead.findById(req.params.id);
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found." });
+    }
+
+    if (lead.status === "Converted") {
+      return res.status(400).json({
+        message: "Converted leads cannot be edited in this prototype."
+      });
+    }
+
+    // Update normal customer details
+    const allowed = [
+      "name", "phone", "email", "destination",
+      "budget", "travelDate", "assignedTo", "status", "notes"
+    ];
+
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
-        if (key === "email") lead.email = String(req.body.email).trim().toLowerCase();
-        else if (key === "budget") lead.budget = Number(req.body.budget || 0);
-        else lead[key] = req.body[key];
+        if (key === "email") {
+          lead.email = String(req.body.email).trim().toLowerCase();
+        } else if (key === "budget") {
+          lead.budget = Number(req.body.budget || 0);
+        } else {
+          lead[key] = req.body[key];
+        }
       }
     }
+
+    // Update WhatsApp consent
+    if (req.body.whatsappOptIn !== undefined) {
+      if (req.body.whatsappOptIn === true) {
+        const source = String(req.body.whatsappOptInSource || "").trim();
+
+        if (!source) {
+          return res.status(400).json({
+            message: "Please provide how the customer gave WhatsApp consent."
+          });
+        }
+
+        lead.whatsappOptIn = true;
+        lead.whatsappOptInAt = new Date();
+        lead.whatsappOptInSource = source;
+      } else {
+        lead.whatsappOptIn = false;
+        lead.whatsappOptInAt = null;
+        lead.whatsappOptInSource = "";
+      }
+    }
+
     lead.phoneNormalized = cleanPhone(lead.phone);
     lead.emailNormalized = cleanEmail(lead.email);
-    const duplicateOr = [{ phoneNormalized: lead.phoneNormalized }];
-    if (lead.emailNormalized) duplicateOr.push({ emailNormalized: lead.emailNormalized });
-    const duplicate = await Lead.findOne({ _id: { $ne: lead._id }, $or: duplicateOr }).select("_id");
-    if (duplicate) return res.status(409).json({ message: "Another lead already uses this phone number or email." });
+
+    const duplicateOr = [
+      { phoneNormalized: lead.phoneNormalized }
+    ];
+
+    if (lead.emailNormalized) {
+      duplicateOr.push({ emailNormalized: lead.emailNormalized });
+    }
+
+    const duplicate = await Lead.findOne({
+      _id: { $ne: lead._id },
+      $or: duplicateOr
+    }).select("_id");
+
+    if (duplicate) {
+      return res.status(409).json({
+        message: "Another lead already uses this phone number or email."
+      });
+    }
+
     await lead.save();
     res.json(lead);
-  } catch (err) { next(err); }
+
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.patch("/:id/status", async (req, res, next) => {
