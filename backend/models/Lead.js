@@ -21,6 +21,18 @@ const leadSchema = new mongoose.Schema({
   assignedTo: { type: String, default: "Unassigned" },
   status: { type: String, enum: LEAD_STATUSES, default: "New" },
   notes: { type: String, trim: true, default: "", maxlength: 3000 },
+  whatsappOptIn: {
+  type: Boolean,
+  default: false
+},
+whatsappOptInAt: {
+  type: Date,
+  default: null
+},
+whatsappOptInSource: {
+  type: String,
+  default: ""
+},
   activities: { type: [activitySchema], default: [] },
   bookingId: { type: mongoose.Schema.Types.ObjectId, ref: "Booking", default: null }
 }, { timestamps: true });

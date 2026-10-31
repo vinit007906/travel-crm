@@ -5,7 +5,22 @@ import { api } from "./api.js";
 const STATUSES = ["New", "Contacted", "Interested", "Follow-up", "Converted", "Lost"];
 const TEAM = ["Unassigned", "Priya Sharma", "Rahul Patil", "Amit Deshmukh", "Neha Joshi"];
 const blankLead = { name: "", phone: "", email: "", destination: "", budget: "", travelDate: "", assignedTo: "Unassigned", status: "New", notes: "" };
-const ROLE_PAGES = { Admin: ["Dashboard", "Leads", "Bookings", "Reminders", "Reports", "User Management", "Team Performance", "Notifications"], Manager: ["Dashboard", "Leads", "Bookings", "Reminders", "Reports", "Team Performance", "Notifications"], Agent: ["Dashboard", "Leads", "Reminders", "My Tasks", "Notifications"] };
+const ROLE_PAGES = {
+  Admin: [
+    "Dashboard", "Leads", "Bookings", "Reminders",
+    "Reports", "User Management", "Team Performance",
+    "Notifications", "WhatsApp Campaigns"
+  ],
+  Manager: [
+    "Dashboard", "Leads", "Bookings", "Reminders",
+    "Reports", "Team Performance", "Notifications",
+    "WhatsApp Campaigns"
+  ],
+  Agent: [
+    "Dashboard", "Leads", "Reminders", "My Tasks",
+    "Notifications"
+  ]
+};
 const DEMO_EMAILS = { Admin: "admin@tripwise.demo", Manager: "manager@tripwise.demo", Agent: "agent@tripwise.demo" };
 
 function money(value) {
@@ -54,6 +69,11 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [campaignSearch, setCampaignSearch] = useState("");
+  const [selectedCampaignLeads, setSelectedCampaignLeads] = useState([]);
+  const [campaignMessage, setCampaignMessage] = useState(
+    "Hello {{name}}! 👋 Greetings from TripWise Travel. Are you planning a trip to {{destination}}? Contact our team to explore our travel packages."
+  );
 
   const flash = (type, message) => {
     setNotice({ type, message });
@@ -154,6 +174,19 @@ export default function App() {
     });
   }, [bookings, cancelledBookings]);
   const unreadCount = notifications.filter(n => !n.read).length;
+  const eligibleFilteredLeads = useMemo(() => {
+    const term = campaignSearch.trim().toLowerCase();
+    return leads.filter(lead =>
+      lead.whatsappOptIn === true &&
+      `${lead.name || ""} ${lead.phone || ""} ${lead.destination || ""}`.toLowerCase().includes(term)
+    );
+  }, [leads, campaignSearch]);
+
+  const selectedEligibleLeads = useMemo(
+    () => leads.filter(lead => selectedCampaignLeads.includes(lead._id) && lead.whatsappOptIn === true),
+    [leads, selectedCampaignLeads]
+  );
+  const previewLead = selectedEligibleLeads[0] || eligibleFilteredLeads[0];
   const pageTitle = useMemo(() => ({
     Dashboard: [user?.role === "Admin" ? "Admin Dashboard" : user?.role === "Manager" ? "Manager Dashboard" : "Agent Dashboard", user?.role === "Admin" ? "Manage the whole travel operation, access and business performance." : user?.role === "Manager" ? "Monitor team progress, bookings and customer follow-ups." : "Your leads, customer follow-ups and next actions in one place."],
     Leads: [user?.role === "Agent" ? "My Leads" : user?.role === "Manager" ? "Team Lead Management" : "Lead Management", user?.role === "Agent" ? "Work only with enquiries assigned to your account." : user?.role === "Manager" ? "Review team enquiries, ownership, and next steps." : "Manage all customer enquiries, ownership, and next steps."],
@@ -161,6 +194,7 @@ export default function App() {
     Reminders: [user?.role === "Agent" ? "My Follow-ups" : "Follow-up Reminders", user?.role === "Agent" ? "Only follow-ups for your assigned customers." : "Keep team callbacks and customer follow-ups on track."],
     Reports: ["Sales reports", "A quick view of recent booking volume and booking value."],
     Notifications: ["Notifications", "Recent updates and actions from your workspace."],
+    "WhatsApp Campaigns": ["WhatsApp Campaigns", "Prepare personalized WhatsApp campaigns for customers who have opted in."],
     "User Management": ["User Management", "Review workspace roles and demo access profiles."],
     "Team Performance": ["Team Performance", "Compare lead ownership, progress and conversion across the team."],
     "My Tasks": ["My Tasks", "Your assigned enquiries and the next actions to complete."]
@@ -212,6 +246,7 @@ export default function App() {
           {(user.role === "Manager" || user.role === "Admin") && <button className={page === "Team Performance" ? "nav-item active" : "nav-item"} onClick={() => setPage("Team Performance")}><span>▥</span> Team Performance</button>}
           {user.role === "Agent" && <button className={page === "My Tasks" ? "nav-item active" : "nav-item"} onClick={() => setPage("My Tasks")}><span>✓</span> My Tasks</button>}
           {user.role !== "Agent" && <button className={page === "Reports" ? "nav-item active" : "nav-item"} onClick={() => setPage("Reports")}><span>▤</span> Reports</button>}
+          {user.role !== "Agent" && <button className={page === "WhatsApp Campaigns" ? "nav-item active" : "nav-item"} onClick={() => { setPage("WhatsApp Campaigns"); setSelectedCampaignLeads([]); }}><span>◉</span> WhatsApp Campaigns</button>}
           <button className={page === "Notifications" ? "nav-item active" : "nav-item"} onClick={() => setPage("Notifications")}><span>♧</span> Alerts <i>{unreadCount || ""}</i></button>
         </nav>
         <div className="sidebar-bottom"><div className="avatar">{user.name.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase()}</div><div><b>{user.name}</b><small>{user.role} · Demo workspace</small></div><button className="signout-btn" onClick={signOut} title="Sign out">↪</button></div>
@@ -262,6 +297,76 @@ export default function App() {
           {page === "Team Performance" && user.role !== "Agent" && <><section className="stats-grid"><StatCard label="Team members" value={TEAM.filter(n=>n!=="Unassigned").length} hint="Configured demo agents"/><StatCard label="Open leads" value={leads.filter(l=>!['Converted','Lost'].includes(l.status)).length} hint="Across the visible team data"/><StatCard label="Follow-up stage" value={leads.filter(l=>l.status==="Follow-up").length} hint="Needs timely contact"/><StatCard label="Converted leads" value={leads.filter(l=>l.status==="Converted").length} hint="Successful conversions"/></section><section className="panel"><div className="panel-heading"><div><h2>Agent performance</h2><p>Lead counts are calculated from the currently loaded lead records.</p></div><button className="secondary-btn" onClick={loadData}>↻ Refresh</button></div><div className="table-wrap"><table><thead><tr><th>AGENT</th><th>ASSIGNED LEADS</th><th>OPEN</th><th>FOLLOW-UPS</th><th>CONVERTED</th><th>ACTION</th></tr></thead><tbody>{TEAM.filter(n=>n!=="Unassigned").map(agent=>{const owned=leads.filter(l=>l.assignedTo===agent);return <tr key={agent}><td><b>{agent}</b></td><td>{owned.length}</td><td>{owned.filter(l=>!['Converted','Lost'].includes(l.status)).length}</td><td>{owned.filter(l=>l.status==="Follow-up").length}</td><td>{owned.filter(l=>l.status==="Converted").length}</td><td><button className="secondary-btn compact-btn" onClick={()=>{setTeamFilter(agent);setPage("Leads");}}>View leads</button></td></tr>})}</tbody></table></div></section></>}
 
           {page === "My Tasks" && user.role === "Agent" && <><section className="stats-grid"><StatCard label="My assigned leads" value={leads.filter(l=>l.assignedTo===user.name).length} hint="Assigned to your demo profile"/><StatCard label="Needs follow-up" value={leads.filter(l=>l.assignedTo===user.name && l.status==="Follow-up").length} hint="Contact these customers next"/><StatCard label="Interested" value={leads.filter(l=>l.assignedTo===user.name && l.status==="Interested").length} hint="Potential travel bookings"/><StatCard label="Converted" value={leads.filter(l=>l.assignedTo===user.name && l.status==="Converted").length} hint="Your successful conversions"/></section><section className="panel"><div className="panel-heading"><div><h2>My assigned leads</h2><p>Quick access to enquiries assigned to {user.name}.</p></div><button className="secondary-btn" onClick={()=>{setTeamFilter(user.name);setPage("Leads");}}>Open lead list</button></div><LeadTable leads={leads.filter(l=>l.assignedTo===user.name)} onDetails={openDetails} onEdit={openEdit} onStatus={changeStatus}/></section><section className="panel"><div className="panel-heading"><div><h2>Next follow-ups</h2><p>Follow-up activities from your assigned leads.</p></div></div>{reminders.filter(r=>leads.some(l=>l._id===r.leadId && l.assignedTo===user.name)).length ? <div className="table-wrap"><table><thead><tr><th>DATE</th><th>CUSTOMER</th><th>PHONE</th><th>NOTE</th><th>ACTION</th></tr></thead><tbody>{reminders.filter(r=>leads.some(l=>l._id===r.leadId && l.assignedTo===user.name)).map((r,i)=><tr key={r._id||i}><td>{date(r.followUpDate)}</td><td>{r.leadName}</td><td>{r.phone}</td><td>{r.note}</td><td><button className="secondary-btn compact-btn" onClick={()=>{const lead=leads.find(l=>l._id===r.leadId);if(lead)openDetails(lead);}}>Open lead</button></td></tr>)}</tbody></table></div>:<EmptyState title="No follow-ups yet" text="Add follow-up dates to your lead activity to see them here."/>}</section></>}
+
+          {page === "WhatsApp Campaigns" && user.role !== "Agent" && <div className="section-grid">
+            <section className="panel">
+              <div className="panel-heading">
+                <div><h2>Select customers</h2><p>{selectedEligibleLeads.length} opted-in customer(s) selected</p></div>
+                <span className="role-chip manager-chip">CONSENT REQUIRED</span>
+              </div>
+              <div className="filters">
+                <div className="search-box"><span>⌕</span><input value={campaignSearch} onChange={e => setCampaignSearch(e.target.value)} placeholder="Search customer, phone or destination" /></div>
+              </div>
+              <label style={{display:"flex",alignItems:"center",gap:8,margin:"12px 0 16px",fontWeight:600}}>
+                <input
+                  type="checkbox"
+                  checked={eligibleFilteredLeads.length > 0 && eligibleFilteredLeads.every(lead => selectedCampaignLeads.includes(lead._id))}
+                  onChange={e => {
+                    if (e.target.checked) {
+                      setSelectedCampaignLeads(current => [...new Set([...current, ...eligibleFilteredLeads.map(lead => lead._id)])]);
+                    } else {
+                      const visibleIds = new Set(eligibleFilteredLeads.map(lead => lead._id));
+                      setSelectedCampaignLeads(current => current.filter(id => !visibleIds.has(id)));
+                    }
+                  }}
+                  disabled={!eligibleFilteredLeads.length}
+                />
+                Select all eligible customers
+              </label>
+              {leads.length ? <div className="table-wrap"><table>
+                <thead><tr><th>SELECT</th><th>CUSTOMER</th><th>DESTINATION</th><th>WHATSAPP CONSENT</th></tr></thead>
+                <tbody>
+                  {leads.filter(lead => {
+                    const term = campaignSearch.trim().toLowerCase();
+                    return `${lead.name || ""} ${lead.phone || ""} ${lead.destination || ""}`.toLowerCase().includes(term);
+                  }).map(lead => {
+                    const optedIn = lead.whatsappOptIn === true;
+                    return <tr key={lead._id}>
+                      <td><input type="checkbox" checked={selectedCampaignLeads.includes(lead._id) && optedIn} disabled={!optedIn} onChange={e => setSelectedCampaignLeads(current => e.target.checked ? [...new Set([...current, lead._id])] : current.filter(id => id !== lead._id))} /></td>
+                      <td><b>{lead.name}</b><small className="subline">{lead.phone}</small></td>
+                      <td>{lead.destination}</td>
+                      <td><span className={`pill ${optedIn ? "confirmed" : "lost"}`}>{optedIn ? "Opted in" : "No consent"}</span></td>
+                    </tr>;
+                  })}
+                </tbody>
+              </table></div> : <EmptyState title="No customers available" text="Add leads to your CRM before preparing a campaign." />}
+              <p className="muted role-footnote">Only customers with recorded WhatsApp opt-in can be selected. Customers without consent remain disabled.</p>
+            </section>
+
+            <section className="panel">
+              <div className="panel-heading"><div><h2>Prepare campaign</h2><p>Personalize your approved WhatsApp template.</p></div></div>
+              <label style={{display:"block",fontWeight:600}}>Message template
+                <textarea rows="7" style={{width:"100%",marginTop:8}} value={campaignMessage} onChange={e => setCampaignMessage(e.target.value)} placeholder="Write your approved template text..." />
+              </label>
+              <div style={{marginTop:20}}>
+                <h3>Message preview</h3>
+                <div className="notes-box" style={{whiteSpace:"pre-wrap"}}>
+                  {previewLead
+                    ? campaignMessage.replaceAll("{{name}}", previewLead.name || "Customer").replaceAll("{{destination}}", previewLead.destination || "your preferred destination")
+                    : "Select an opted-in customer to preview the personalized message."}
+                </div>
+                {previewLead && <small className="muted">Preview for {previewLead.name}</small>}
+              </div>
+              <div className="detail-grid" style={{marginTop:20}}>
+                <div><small>Selected recipients</small><b>{selectedEligibleLeads.length}</b></div>
+                <div><small>Template status</small><b>Pending approval</b></div>
+              </div>
+              <button className="primary-btn" style={{marginTop:18}} disabled>
+                Send campaign — unavailable
+              </button>
+              <p className="muted role-footnote">Sending is disabled until the Interakt template is approved and the backend campaign endpoint is secured and connected. This screen does not send messages.</p>
+            </section>
+          </div>}
 
           {page === "Leads" && <section className="panel">
             <div className="panel-heading leads-panel-heading"><div><h2>{user.role === "Agent" ? "My assigned leads" : "All leads"}</h2><p>{(user.role === "Agent" ? leads.filter(l => l.assignedTo === user.name) : leads).length} matching enquiry/enquiries · Search, filter, update, or export</p></div><button className="secondary-btn export-btn" onClick={exportLeads}>↓ Export CSV</button></div>

@@ -8,6 +8,7 @@ import authRoutes from "./routes/authRoutes.js";
 import leadRoutes from "./routes/leadRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
+import whatsappRoutes from "./routes/whatsappRoutes.js";
 
 dotenv.config();
 
@@ -39,6 +40,7 @@ app.use("/api/leads", leadRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/whatsapp", whatsappRoutes);
 // Error handling
 app.use((err, _req, res, _next) => {
   console.error(err);
