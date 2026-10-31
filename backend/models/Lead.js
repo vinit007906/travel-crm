@@ -25,10 +25,16 @@ const leadSchema = new mongoose.Schema({
   type: Boolean,
   default: false
 },
+whatsappOptIn: {
+  type: Boolean,
+  default: false
+},
+
 whatsappOptInAt: {
   type: Date,
   default: null
 },
+
 whatsappOptInSource: {
   type: String,
   default: ""

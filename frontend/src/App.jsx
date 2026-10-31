@@ -4,7 +4,7 @@ import { api } from "./api.js";
 
 const STATUSES = ["New", "Contacted", "Interested", "Follow-up", "Converted", "Lost"];
 const TEAM = ["Unassigned", "Priya Sharma", "Rahul Patil", "Amit Deshmukh", "Neha Joshi"];
-const blankLead = { name: "", phone: "", email: "", destination: "", budget: "", travelDate: "", assignedTo: "Unassigned", status: "New", notes: "" };
+const blankLead = { name: "", phone: "", email: "", destination: "", budget: "", travelDate: "", assignedTo: "Unassigned", status: "New", notes: "", whatsappOptIn: false, whatsappOptInSource: "" };
 const ROLE_PAGES = {
   Admin: [
     "Dashboard", "Leads", "Bookings", "Reminders",
@@ -396,6 +396,25 @@ export default function App() {
             {user.role !== "Agent" && <label>Assigned to<select value={leadForm.assignedTo} onChange={e => setLeadForm({...leadForm, assignedTo:e.target.value})}>{TEAM.map(t => <option key={t}>{t}</option>)}</select></label>}
             <label>Status<select value={leadForm.status} onChange={e => setLeadForm({...leadForm, status:e.target.value})}>{STATUSES.filter(s => s !== "Converted").map(s => <option key={s}>{s}</option>)}</select></label>
             <label className="full-field">Notes<textarea rows="3" value={leadForm.notes} onChange={e => setLeadForm({...leadForm, notes:e.target.value})} placeholder="Customer preferences, travel needs, etc." /></label>
+            <div className="full-field" style={{padding:"12px 14px",border:"1px solid #e8e4da",borderRadius:10,background:"#faf9f5"}}>
+              <label style={{display:"flex",alignItems:"center",gap:10,fontWeight:600}}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(leadForm.whatsappOptIn)}
+                  onChange={e => setLeadForm({...leadForm, whatsappOptIn:e.target.checked, whatsappOptInSource:e.target.checked ? leadForm.whatsappOptInSource : ""})}
+                />
+                Customer has agreed to receive WhatsApp messages
+              </label>
+              <small className="muted" style={{display:"block",marginTop:6}}>Only enable this after the customer has explicitly agreed to receive messages.</small>
+              {leadForm.whatsappOptIn && <label style={{display:"block",marginTop:12}}>Consent source
+                <input
+                  value={leadForm.whatsappOptInSource || ""}
+                  onChange={e => setLeadForm({...leadForm, whatsappOptInSource:e.target.value})}
+                  placeholder="e.g. Website form or signed consent"
+                  required
+                />
+              </label>}
+            </div>
             <div className="form-actions"><button type="button" className="secondary-btn" onClick={() => setModal(null)}>Cancel</button><button className="primary-btn" disabled={busy}>{busy ? "Saving…" : modal === "edit" ? "Save changes" : "Create lead"}</button></div>
           </form> : <div className="details-content">
             <div className="details-summary"><div><span className="eyebrow">DESTINATION</span><h3>{selected.destination}</h3></div><span className={`pill ${selected.status.toLowerCase().replace(/[^a-z]+/g,"-")}`}>{selected.status}</span></div>
